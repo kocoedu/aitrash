@@ -1,10 +1,3 @@
-/**
- * STREAMING_CHUNK:Initializing serverless function handler for Roboflow Serverless Cloud API...
- * Vercel Serverless Function: /api/predict
- * Updates endpoint to https://serverless.roboflow.com/garbage-classification-4vzo9/1
- * and sends base64/buffer body according to Roboflow standard REST API.
- */
-
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
@@ -19,6 +12,7 @@ export default async function handler(req, res) {
         }
 
         const apiKey = process.env.ROBOFLOW_API_KEY;
+        const endpointBase = process.env.ROBOFLOW_ENDPOINT || 'https://serverless.roboflow.com/garbage-classification-4vzo9/1';
 
         // If ROBOFLOW_API_KEY is not configured, fall back to test mode
         if (!apiKey) {
@@ -41,10 +35,10 @@ export default async function handler(req, res) {
         // Clean base64 string
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        // Correct Roboflow Serverless Cloud API endpoint
-        const roboflowUrl = `https://serverless.roboflow.com/garbage-classification-4vzo9/1?api_key=${apiKey}`;
+        // Construct Roboflow Serverless Cloud API endpoint with API key
+        const roboflowUrl = `${endpointBase}?api_key=${apiKey}`;
 
-        // Send request to Roboflow Serverless API using application/x-www-form-urlencoded with base64 data
+        // Send request to Roboflow Serverless API using application/x-www-form-urlencoded
         const roboflowResponse = await fetch(roboflowUrl, {
             method: 'POST',
             body: base64Data,
@@ -65,7 +59,12 @@ export default async function handler(req, res) {
         let topPrediction = { class: 'trash', confidence: 0.5 };
 
         // Handle Roboflow classification & object detection responses
-        if (result.predictions && result.predictions.length > 0) {
+        if (result.class) {
+            topPrediction = {
+                class: result.class,
+                confidence: result.confidence || 0.8
+            };
+        } else if (result.predictions && result.predictions.length > 0) {
             const sorted = [...result.predictions].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
             topPrediction = {
                 class: sorted[0].class || sorted[0].predicted_class || 'trash',
@@ -79,11 +78,6 @@ export default async function handler(req, res) {
         } else if (result.predicted_classes && result.predicted_classes.length > 0) {
             topPrediction = {
                 class: result.predicted_classes[0],
-                confidence: result.confidence || 0.8
-            };
-        } else if (result.class) {
-            topPrediction = {
-                class: result.class,
                 confidence: result.confidence || 0.8
             };
         }
