@@ -1,11 +1,11 @@
 /**
- * STREAMING_CHUNK:Initializing serverless function handler for Roboflow...
+ * STREAMING_CHUNK:Initializing serverless function handler for Roboflow Serverless Cloud API...
  * Vercel Serverless Function: /api/predict
- * Corrects payload submission format to match Roboflow standard REST API expectations.
+ * Updates endpoint to https://serverless.roboflow.com/garbage-classification-4vzo9/1
+ * and sends base64/buffer body according to Roboflow standard REST API.
  */
 
 export default async function handler(req, res) {
-    // Allow POST requests only
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
             const mockClasses = ['paper', 'plastic', 'glass', 'metal', 'cardboard', 'trash'];
             const randomClass = mockClasses[Math.floor(Math.random() * mockClasses.length)];
-            const randomConfidence = Number((0.75 + Math.random() * 0.23).toFixed(2));
+            const randomConfidence = Number((0.78 + Math.random() * 0.20).toFixed(2));
 
             return res.status(200).json({
                 isTestMode: true,
@@ -41,18 +41,13 @@ export default async function handler(req, res) {
         // Clean base64 string
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        const modelId = 'garbage-classification-4vzo9';
-        const version = '1';
-        // Roboflow hosted inference API accepts raw image bytes or base64 in body depending on content-type.
-        // Sending raw buffer with application/x-www-form-urlencoded or multipart/form-data.
-        const roboflowUrl = `https://detect.roboflow.com/${modelId}/${version}?api_key=${apiKey}`;
+        // Correct Roboflow Serverless Cloud API endpoint
+        const roboflowUrl = `https://serverless.roboflow.com/garbage-classification-4vzo9/1?api_key=${apiKey}`;
 
-        // Send request to Roboflow using raw buffer body as standard for Roboflow API
-        const buffer = Buffer.from(base64Data, 'base64');
-
+        // Send request to Roboflow Serverless API using application/x-www-form-urlencoded with base64 data
         const roboflowResponse = await fetch(roboflowUrl, {
             method: 'POST',
-            body: buffer,
+            body: base64Data,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
@@ -69,9 +64,8 @@ export default async function handler(req, res) {
 
         let topPrediction = { class: 'trash', confidence: 0.5 };
 
-        // Handle both Object Detection format (.predictions array) and Classification format (.top / .predictions)
+        // Handle Roboflow classification & object detection responses
         if (result.predictions && result.predictions.length > 0) {
-            // Sort by confidence descending
             const sorted = [...result.predictions].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
             topPrediction = {
                 class: sorted[0].class || sorted[0].predicted_class || 'trash',
@@ -85,6 +79,11 @@ export default async function handler(req, res) {
         } else if (result.predicted_classes && result.predicted_classes.length > 0) {
             topPrediction = {
                 class: result.predicted_classes[0],
+                confidence: result.confidence || 0.8
+            };
+        } else if (result.class) {
+            topPrediction = {
+                class: result.class,
                 confidence: result.confidence || 0.8
             };
         }
