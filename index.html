@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 분리배출 도우미</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Inter & Jua for friendly look) -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+        }
+        .font-jua {
+            font-family: 'Jua', sans-serif;
+        }
+    </style>
+</head>
+<body class="text-slate-700 flex flex-col min-h-screen">
+
+    <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-sky-100">
+        <div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-sky-500 flex items-center justify-center text-white shadow-md shadow-sky-200">
+                    <i class="fa-solid fa-recycle text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-jua text-xl text-sky-800 tracking-wide">AI 분리배출 도우미</h1>
+                    <p class="text-xs text-slate-400">고등학생을 위한 스마트 분리수거 가이드</p>
+                </div>
+            </div>
+            <div id="modeBadge" class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold flex items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-triangle-exclamation"></i> <span>테스트 모드 (단독 실행)</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-2xl w-full mx-auto p-4 md:p-6 space-y-6">
+        
+        <!-- Welcome Card -->
+        <section class="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-sm border border-sky-100 text-center relative overflow-hidden">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-sky-50 rounded-full pointer-events-none"></div>
+            <h2 class="font-jua text-2xl text-sky-900 mb-2">어떤 쓰레기인가요? 🗑️</h2>
+            <p class="text-sm text-slate-500 mb-4">버릴 물건의 사진을 올리거나 찍어주세요. AI가 똑똑하게 재질을 분석해 올바른 분리배출 방법을 알려드려요!</p>
+            
+            <!-- Upload Area -->
+            <div id="dropZone" class="border-2 border-dashed border-sky-200 rounded-2xl p-6 bg-sky-50/50 hover:bg-sky-50 transition cursor-pointer flex flex-col items-center justify-center relative">
+                <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" aria-label="사진 업로드">
+                <div class="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center text-sky-500 mb-3 text-2xl">
+                    <i class="fa-solid fa-camera"></i>
+                </div>
+                <p class="font-semibold text-sky-900 text-sm mb-1">여기를 눌러 사진을 업로드하세요</p>
+                <p class="text-xs text-slate-400">카메라 촬영 또는 갤러리 선택 가능 (JPG, PNG)</p>
+            </div>
+        </section>
+
+        <!-- Preview & Control Section (Hidden initially) -->
+        <section id="previewSection" class="hidden bg-white/90 backdrop-blur rounded-3xl p-6 shadow-sm border border-sky-100 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-jua text-lg text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-image text-sky-500"></i> 선택한 이미지
+                </h3>
+                <span id="imageInfo" class="text-xs text-slate-400"></span>
+            </div>
+            
+            <!-- Image Preview Box -->
+            <div class="relative rounded-2xl overflow-hidden bg-slate-100 aspect-video flex items-center justify-center border border-slate-200">
+                <img id="imagePreview" src="" alt="업로드된 이미지 미리보기" class="w-full h-full object-contain">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button id="resetBtn" class="py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-jua text-base transition flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-rotate-right"></i> 초기화
+                </button>
+                <button id="analyzeBtn" class="py-3 px-4 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-jua text-base transition flex items-center justify-center gap-2 shadow-md shadow-sky-200">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 분석하기
+                </button>
+            </div>
+        </section>
+
+        <!-- Loading Spinner State -->
+        <section id="loadingSection" class="hidden bg-white/90 backdrop-blur rounded-3xl p-8 shadow-sm border border-sky-100 text-center space-y-4">
+            <div class="inline-block w-12 h-12 border-4 border-sky-200 border-t-sky-500 rounded-full animate-spin"></div>
+            <h3 class="font-jua text-lg text-sky-900">AI가 열심히 분석하고 있어요... ✨</h3>
+            <p class="text-xs text-slate-400">잠시만 기다려주세요 (약 1~3초 소요)</p>
+        </section>
+
+        <!-- Error Message Box -->
+        <section id="errorSection" class="hidden bg-rose-50 border border-rose-200 rounded-3xl p-6 text-center space-y-3">
+            <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-jua text-lg text-rose-900">분석 중 오류가 발생했어요</h3>
+            <p id="errorMessage" class="text-xs text-rose-600"></p>
+            <button onclick="hideError()" class="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition shadow-sm">확인</button>
+        </section>
+
+        <!-- Result Section -->
+        <section id="resultSection" class="hidden space-y-4">
+            <!-- AI Classification Card -->
+            <div class="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-sm border border-sky-100 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 class="font-jua text-lg text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-square-poll-vertical text-sky-500"></i> AI 분석 결과
+                    </h3>
+                    <div id="confidenceBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-700"></div>
+                </div>
+
+                <!-- Prediction Highlight -->
+                <div class="bg-sky-50/70 rounded-2xl p-5 flex items-center gap-4 border border-sky-100">
+                    <div id="resultIcon" class="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-3xl text-sky-500 shrink-0">
+                        📦
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 font-medium mb-1">인식된 재질</div>
+                        <div id="resultKorName" class="font-jua text-2xl text-sky-900">종이류</div>
+                        <div id="resultEngClass" class="text-xs text-slate-400 font-mono mt-0.5">class: paper</div>
+                    </div>
+                </div>
+
+                <!-- Low Confidence Warning (if needed) -->
+                <div id="lowConfidenceWarning" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation text-amber-500 text-base shrink-0"></i>
+                    <span>신뢰도가 낮아요! 사진이 흐리거나 여러 물건이 섞여있을 수 있으니 아래 안내를 꼭 확인해주세요.</span>
+                </div>
+            </div>
+
+            <!-- Detailed Guide Card -->
+            <div id="guideCard" class="bg-white/90 backdrop-blur rounded-3xl p-6 shadow-sm border border-sky-100 space-y-4">
+                <h4 class="font-jua text-base text-sky-900 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-sky-500"></i> 올바른 분리배출 방법
+                </h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-bold text-sky-600 block mb-1"><i class="fa-solid fa-circle-check"></i> 비우고 헹구기</span>
+                        <p id="guideStep1" class="text-xs text-slate-600 leading-relaxed">내용물을 깨끗이 비우고 이물질이 남지 않도록 헹궈서 배출해주세요.</p>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-bold text-sky-600 block mb-1"><i class="fa-solid fa-ban"></i> 섞지 않고 분리하기</span>
+                        <p id="guideStep2" class="text-xs text-slate-600 leading-relaxed">다른 재질로 된 뚜껑이나 라벨 등은 제거한 뒤 재질별로 배출합니다.</p>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-100 rounded-2xl text-[11px] text-slate-500 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-sky-500 shrink-0"></i>
+                    <span>⚠️ AI 분류 결과는 재질 추정일 뿐 실제 지자체 배출 규칙과 다를 수 있습니다. 정확한 배출은 거주 지역 안내문을 참고하세요.</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="mt-auto py-6 text-center text-xs text-slate-400 border-t border-sky-100 bg-white/40">
+        <p>AI 분리배출 도우미 • 단독 실행 가능 버전</p>
+    </footer>
+
+    <script>
+        // Class mapping and guide database in friendly Korean
+        const classInfoMap = {
+            'paper': {
+                korName: '종이류',
+                icon: '📄',
+                step1: '상자에 붙은 테이프, 송장, 스티커 등 이물질을 깨끗이 제거해주세요.',
+                step2: '종이류는 물기에 젖지 않도록 차곡차곡 쌓아서 반듯하게 배출해주세요.'
+            },
+            'plastic': {
+                korName: '플라스틱류',
+                icon: '🥤',
+                step1: '용기 안에 담긴 내용물을 깨끗이 비우고 물로 헹궈서 배출해주세요.',
+                step2: '부착된 상표(라벨)나 다른 재질의 뚜껑은 가능하면 떼어낸 뒤 버려주세요.'
+            },
+            'glass': {
+                korName: '유리류',
+                icon: '🍾',
+                step1: '병뚜껑(금속, 플라스틱 등)을 제거하고 속을 깨끗이 비워주세요.',
+                step2: '깨지지 않도록 주의하고, 음료수병, 맥주병 등 재사용 병은 소주/맥주 공병함에 놓아주세요.'
+            },
+            'metal': {
+                korName: '금속류 (캔/고철)',
+                icon: '🥫',
+                step1: '캔류 내부의 이물질을 비우고, 플라스틱 뚜껑 등이 있다면 분리해주세요.',
+                step2: '부탄캔이나 살충제캔은 안전을 위해 반드시 구멍을 뚫어 가스를 빼고 배출합니다.'
+            },
+            'cardboard': {
+                korName: '골판지류 (택배박스)',
+                icon: '📦',
+                step1: '박스에 붙어있는 테이프, 택배 송장, 철심 등을 모두 제거해주세요.',
+                step2: '부피를 줄이기 위해 납작하게 접어서 종이박스류로 배출합니다.'
+            },
+            'trash': {
+                korName: '일반쓰레기 (종량제봉투)',
+                icon: '🗑️',
+                step1: '재활용이 불가능한 오염된 쓰레기나 휴지, 비닐류는 종량제봉투에 담아주세요.',
+                step2: '음식물이나 재활용품이 섞이지 않도록 주의하여 배출합니다.'
+            }
+        };
+
+        // DOM Elements
+        const imageInput = document.getElementById('imageInput');
+        const previewSection = document.getElementById('previewSection');
+        const imagePreview = document.getElementById('imagePreview');
+        const imageInfo = document.getElementById('imageInfo');
+        const resetBtn = document.getElementById('resetBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loadingSection = document.getElementById('loadingSection');
+        const errorSection = document.getElementById('errorSection');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultSection = document.getElementById('resultSection');
+        const resultIcon = document.getElementById('resultIcon');
+        const resultKorName = document.getElementById('resultKorName');
+        const resultEngClass = document.getElementById('resultEngClass');
+        const confidenceBadge = document.getElementById('confidenceBadge');
+        const lowConfidenceWarning = document.getElementById('lowConfidenceWarning');
+        const guideStep1 = document.getElementById('guideStep1');
+        const guideStep2 = document.getElementById('guideStep2');
+        const modeBadge = document.getElementById('modeBadge');
+
+        let currentFile = null;
+        let currentBase64 = null;
+
+        // File upload event listener
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            currentFile = file;
+            imageInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentBase64 = event.target.result;
+                imagePreview.src = currentBase64;
+                previewSection.classList.remove('hidden');
+                resultSection.classList.add('hidden');
+                errorSection.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Reset button event
+        resetBtn.addEventListener('click', function() {
+            imageInput.value = '';
+            currentFile = null;
+            currentBase64 = null;
+            previewSection.classList.add('hidden');
+            resultSection.classList.add('hidden');
+            loadingSection.classList.add('hidden');
+            errorSection.classList.add('hidden');
+        });
+
+        function hideError() {
+            errorSection.classList.add('hidden');
+        }
+
+        // Analyze button event (Try calling /api/predict first, fallback to robust simulation if standalone)
+        analyzeBtn.addEventListener('click', async function() {
+            if (!currentBase64) return;
+
+            previewSection.classList.add('hidden');
+            resultSection.classList.add('hidden');
+            errorSection.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+
+            try {
+                // Attempt fetching from backend /api/predict (works if hosted on Vercel)
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: currentBase64 })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    modeBadge.className = "px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold flex items-center gap-1 shadow-sm";
+                    modeBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Roboflow AI 연동됨</span>`;
+                    displayResult(data.prediction);
+                    return;
+                }
+                throw new Error('서버리스 함수 응답 없음 - 테스트 모드로 전환합니다.');
+
+            } catch (err) {
+                // Fallback simulation mode for standalone HTML execution
+                console.warn('Standalone test mode active:', err.message);
+                
+                await new Promise(resolve => setTimeout(resolve, 1000)); // simulate network delay
+
+                const classes = Object.keys(classInfoMap);
+                const randomClass = classes[Math.floor(Math.random() * classes.length)];
+                const randomConfidence = Number((0.78 + Math.random() * 0.20).toFixed(2));
+
+                modeBadge.className = "px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold flex items-center gap-1 shadow-sm";
+                modeBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>테스트 모드 (단독 실행)</span>`;
+
+                displayResult({
+                    class: randomClass,
+                    confidence: randomConfidence
+                });
+            }
+        });
+
+        // Render result data
+        function displayResult(pred) {
+            loadingSection.classList.add('hidden');
+            resultSection.classList.remove('hidden');
+
+            const className = pred.class || 'trash';
+            const confidence = typeof pred.confidence === 'number' ? pred.confidence : 0;
+            const confidencePercent = (confidence * 100).toFixed(1);
+
+            const info = classInfoMap[className] || {
+                korName: '일반쓰레기',
+                icon: '🗑️',
+                step1: '이물질을 제거한 뒤 규격 봉투에 담아 배출해주세요.',
+                step2: '재활용이 어려운 품목은 일반쓰레기로 버립니다.'
+            };
+
+            resultIcon.textContent = info.icon;
+            resultKorName.textContent = info.korName;
+            resultEngClass.textContent = `class: ${className} (${confidencePercent}%)`;
+            confidenceBadge.textContent = `신뢰도 ${confidencePercent}%`;
+
+            if (confidence < 0.6) {
+                lowConfidenceWarning.classList.remove('hidden');
+            } else {
+                lowConfidenceWarning.classList.add('hidden');
+            }
+
+            guideStep1.textContent = info.step1;
+            guideStep2.textContent = info.step2;
+
+            // Smooth scroll to result
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
